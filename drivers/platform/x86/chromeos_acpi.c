@@ -36,6 +36,7 @@
 #include <linux/nvram.h>
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
+#include <linux/crc32.h>
 
 #include "../chrome/chromeos.h"
 
@@ -760,6 +761,44 @@ static struct chromeos_vbc chromeos_vbc_nvram = {
 	.write = chromeos_vbc_nvram_write,
 };
 
+static char fakehwid[256] = "";
+
+static ssize_t fakehwid_show(struct device *dev, struct device_attribute *attr,
+			    char *buf)
+{
+	return sprintf(buf, "%s\n", fakehwid);
+}
+
+static ssize_t fakehwid_store(struct device *dev, struct device_attribute *attr,
+			     const char *buf, size_t count)
+{
+	static const char base8_alphabet[] = "23456789";
+	static const char base32_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+	char board[230];
+	char serial[256];
+	char crc[3];
+	u32 crc32_val;
+
+	if (count > 230)
+		return -EINVAL;
+
+       sscanf(buf, "%s", board);
+
+	snprintf(serial, sizeof(serial), "%s %s", board, "B2BB2BB2BB2BB2BB");
+
+	crc32_val = crc32(0 ^ 0xffffffff, serial, strlen(serial)) ^ 0xffffffff;
+
+	crc[0] = base8_alphabet[(crc32_val >> 5) & 0x7];
+	crc[1] = base32_alphabet[crc32_val & 0x1f];
+	crc[2] = '\0';
+
+	snprintf(fakehwid, sizeof(fakehwid), "%s %s%s", board, "B2B-B2B-B2B-B2B-B2B-B", crc);
+
+       return count;
+}
+
+static const DEVICE_ATTR(HWID, 0644, fakehwid_show, fakehwid_store);
+
 static int __init chromeos_acpi_init(void)
 {
 	int ret = 0;
@@ -777,6 +816,10 @@ static int __init chromeos_acpi_init(void)
 		printk(MY_ERR "unable to register platform device\n");
 		return PTR_ERR(chromeos_acpi.p_dev);
 	}
+
+	device_create_file(&chromeos_acpi.p_dev->dev, &dev_attr_HWID);
+
+	return 0;
 
 	ret = acpi_bus_register_driver(&chromeos_acpi_driver);
 	if (ret < 0) {
