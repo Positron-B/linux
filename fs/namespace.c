@@ -3279,9 +3279,8 @@ int path_mount(const char *dev_name, struct path *path,
 	if (flags & SB_MANDLOCK)
 		warn_mandlock();
 
-	/* Default to relatime unless overriden */
-	if (!(flags & MS_NOATIME))
-		mnt_flags |= MNT_RELATIME;
+	/* Default to noatime */
+	mnt_flags |= MNT_NOATIME;
 
 	/*
 	 * The nosymfollow option used to be extracted from data_page by an LSM.
@@ -3308,24 +3307,10 @@ int path_mount(const char *dev_name, struct path *path,
 		mnt_flags |= MNT_NODEV;
 	if (flags & MS_NOEXEC)
 		mnt_flags |= MNT_NOEXEC;
-	if (flags & MS_NOATIME)
-		mnt_flags |= MNT_NOATIME;
-	if (flags & MS_NODIRATIME)
-		mnt_flags |= MNT_NODIRATIME;
-	if (flags & MS_STRICTATIME)
-		mnt_flags &= ~(MNT_RELATIME | MNT_NOATIME);
 	if (flags & MS_RDONLY)
 		mnt_flags |= MNT_READONLY;
 	if (flags & MS_NOSYMFOLLOW)
 		mnt_flags |= MNT_NOSYMFOLLOW;
-
-	/* The default atime for remount is preservation */
-	if ((flags & MS_REMOUNT) &&
-	    ((flags & (MS_NOATIME | MS_NODIRATIME | MS_RELATIME |
-		       MS_STRICTATIME)) == 0)) {
-		mnt_flags &= ~MNT_ATIME_MASK;
-		mnt_flags |= path->mnt->mnt_flags & MNT_ATIME_MASK;
-	}
 
 	sb_flags = flags & (SB_RDONLY |
 			    SB_SYNCHRONOUS |
